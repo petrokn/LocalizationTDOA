@@ -1,16 +1,22 @@
 from scikits.audiolab import wavread
 import numpy
-from numpy import multiarray
 import math
 from matplotlib import pyplot
 from scipy import linalg
 import time
+from parallel_process import ProcessParallel
+from multiprocessing import Array
+from helpers import time_delay_func_paralel, perdelta
 
 
-# TODO: refractor this madness
 # base algorithm in MATLAB can be found at https://github.com/StevenJL/tdoa_localization/
 class Core:
-    def __init__(self, audio):
+    def __init__(self, audio, mic_amount, trials, proc_number):
+        if proc_number <= 0:
+            raise ValueError('Amount of process to run must be 1 or greater.')
+
+        self.proc_numer = proc_number
+
         # the magic of preparing audio data; from numpy arrays to flatten list with removed duplicated elements
         self.wave = wavread(audio)[0]  # removing wav technical data; only audio data stays
         self.wave = [list(pair) for pair in self.wave]
@@ -22,9 +28,9 @@ class Core:
         self.scale = 0.8 / max(self.wave)
         self.wave = numpy.multiply(self.scale, self.wave)
 
-        self.Trials = 10
+        self.Trials = trials
         self.Radius = 50
-        self.N = 8
+        self.N = mic_amount
         self.Theta = numpy.linspace(0, 2 * math.pi, self.N + 1)
 
         self.X = [self.Radius * math.cos(x) for x in self.Theta[0: -1]]
@@ -40,20 +46,25 @@ class Core:
         self.Distances = []
         self.TimeDelay = []
         self.Padding = []
+        print 'inited'
 
     def generate_source_positions(self):
         for i in range(self.Trials):
-            r = numpy.random.rand(1) * 50
-            t = numpy.random.rand(1) * 2 * math.pi
+            #r = numpy.random.rand(1) * 50
+            #t = numpy.random.rand(1) * 2 * math.pi
+            r = 0.1 * 50
+            t = 0.2 * 50
             x = r * math.cos(t)
             y = r * math.sin(t)
-            z = numpy.random.rand(1) * 20
+            z = 0.3 * 20
+            #z = numpy.random.rand(1) * 20
             self.True_position[i, 0] = x
             self.True_position[i, 1] = y
             self.True_position[i, 2] = z
+        print 'generated source positions.'
 
     def generate_distances(self):
-        self.Distances = numpy.zeros((self.Trials, 8))
+        self.Distances = numpy.zeros((self.Trials, self.N))
         for i in range(self.Trials):
             for j in range(self.N):
                 x1 = self.True_position[i, 0]
@@ -63,66 +74,31 @@ class Core:
                 y2 = self.Sen_position[j, 1]
                 z2 = self.Sen_position[j, 2]
                 self.Distances[i, j] = math.sqrt((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)
+        print 'generated distances.'
 
     def prepare(self):
         self.TimeDelay = numpy.divide(self.Distances, 340.29)
         self.Padding = numpy.multiply(self.TimeDelay, 44100)
+        print 'prepare passed.'
 
     def generate_signals(self):
         for i in range(self.Trials):
             x = self.True_position[i, 0]
             y = self.True_position[i, 1]
             z = self.True_position[i, 2]
-            xstr = str(round(x))
-            ystr = str(round(y))
-            zstr = str(round(z))
-            istr = str(i)
-            name = 'Trial_', istr, '_', xstr, '_', ystr, '_', zstr, '_mdove.wav'
 
-            mic1 = numpy.vstack((numpy.zeros((int(round(self.Padding[i, 0])), 1)), self.wave))
-            mic2 = numpy.vstack((numpy.zeros((int(round(self.Padding[i, 1])), 1)), self.wave))
-            mic3 = numpy.vstack((numpy.zeros((int(round(self.Padding[i, 2])), 1)), self.wave))
-            mic4 = numpy.vstack((numpy.zeros((int(round(self.Padding[i, 3])), 1)), self.wave))
-            mic5 = numpy.vstack((numpy.zeros((int(round(self.Padding[i, 4])), 1)), self.wave))
-            mic6 = numpy.vstack((numpy.zeros((int(round(self.Padding[i, 5])), 1)), self.wave))
-            mic7 = numpy.vstack((numpy.zeros((int(round(self.Padding[i, 6])), 1)), self.wave))
-            mic8 = numpy.vstack((numpy.zeros((int(round(self.Padding[i, 7])), 1)), self.wave))
-
-            l1 = len(mic1)
-            l2 = len(mic2)
-            l3 = len(mic3)
-            l4 = len(mic4)
-            l5 = len(mic5)
-            l6 = len(mic6)
-            l7 = len(mic7)
-            l8 = len(mic8)
-            lenvec = numpy.array([l1, l2, l3, l4, l5, l6, l7, l8])
+            mic_data = [numpy.vstack((numpy.zeros((int(round(self.Padding[i, j])), 1)), self.wave)) for j in range(self.N)]
+            lenvec = numpy.array([len(mic) for mic in mic_data])
             m = max(lenvec)
-            c = numpy.array([m-l1, m-l2, m-l3, m-l4, m-l5, m-l6, m-l7, m-l8])
-            mic1 = numpy.vstack((mic1, numpy.zeros((c[0], 1))))
-            mic2 = numpy.vstack((mic2, numpy.zeros((c[1], 1))))
-            mic3 = numpy.vstack((mic3, numpy.zeros((c[2], 1))))
-            mic4 = numpy.vstack((mic4, numpy.zeros((c[3], 1))))
-            mic5 = numpy.vstack((mic5, numpy.zeros((c[4], 1))))
-            mic6 = numpy.vstack((mic6, numpy.zeros((c[5], 1))))
-            mic7 = numpy.vstack((mic7, numpy.zeros((c[6], 1))))
-            mic8 = numpy.vstack((mic8, numpy.zeros((c[7], 1))))
+            c = numpy.array([m - mic_len for mic_len in lenvec])
+            mic_data = [numpy.vstack((current_mic, numpy.zeros((c[idx], 1)))) for idx, current_mic in enumerate(mic_data)]
+            mic_data = [numpy.divide(current_mic, self.Distances[i, idx]) for idx, current_mic in enumerate(mic_data)]
+            multitrack = numpy.array(mic_data)
 
-            mic1 = numpy.divide(mic1, self.Distances[i, 0])
-            mic2 = numpy.divide(mic2, self.Distances[i, 1])
-            mic3 = numpy.divide(mic3, self.Distances[i, 2])
-            mic4 = numpy.divide(mic4, self.Distances[i, 3])
-            mic5 = numpy.divide(mic5, self.Distances[i, 4])
-            mic6 = numpy.divide(mic6, self.Distances[i, 5])
-            mic7 = numpy.divide(mic7, self.Distances[i, 6])
-            mic8 = numpy.divide(mic8, self.Distances[i, 7])
+            print 'prepared all data.'
 
-            multitrack = numpy.array([mic1, mic2, mic3, mic4, mic5, mic6, mic7, mic8])
-
-            start = time.time()
             x, y, z = self.locate(self.Sen_position, multitrack)
-            end = time.time()
-            print (end - start), 'passed for ', i, ' trial'
+
             self.Est_position[i, 0] = x
             self.Est_position[i, 1] = y
             self.Est_position[i, 2] = z
@@ -133,8 +109,32 @@ class Core:
 
         timedelayvec = numpy.zeros((len, 1))
 
-        for p in range(len):
-            timedelayvec[p] = self.time_delay_func(multitrack[0, ], multitrack[p, ])
+        starts = time.time()
+
+        if self.proc_numer == 1:
+            for p in range(len):
+                timedelayvec[p] = self.time_delay_func(multitrack[0, ], multitrack[p, ])
+        else:
+            pp = ProcessParallel()
+
+            outs = Array('d', range(len))
+
+            ranges = []
+
+            for result in perdelta(0, len, len / self.proc_numer):
+                ranges.append(result)
+
+            for start, end in ranges:
+                pp.add_task(time_delay_func_paralel, (start, end, outs, multitrack))
+
+            pp.start_all()
+            pp.join_all()
+
+            for idx, res in enumerate(outs):
+                timedelayvec[idx] = res
+
+        ends = time.time()
+        print (ends - starts), 'passed for trial'
 
         Amat = numpy.zeros((len, 1))
         Bmat = numpy.zeros((len, 1))
@@ -182,8 +182,8 @@ class Core:
 
     @staticmethod
     def time_delay_func(x, y):
-        c = numpy.correlate(list(x.flatten()), list(y.flatten()), "full")
-        #c = multiarray.correlate(x, y, "full")
+        print 'locating ...'
+        c = numpy.correlate(x[:, 0], y[:, 0], "full")
         C, I = c.max(0), c.argmax(0)
         out = ((float(len(c))+1.0)/2.0 - I)/44100.0
         return out
@@ -197,5 +197,6 @@ class Core:
         pyplot.title('TDOA Hyperbolic Localization')
         pyplot.axis([-50, 50, -50, 50])
         pyplot.show()
+
 
 
