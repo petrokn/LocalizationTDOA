@@ -1,6 +1,18 @@
 # LocalizationTDOA
+
 TDOA localization Python implementation.
 
-Original algorithm and sameple were took from 
+Based on: 
     https://github.com/StevenJL/tdoa_localization
-and implemented with Python 2.7, numpy and matplotlib.
+
+# Requirements
+
+System bin/libs:
+    - Python 2.7
+    - libsndfile-devel
+    - tkinter
+Python libs:
+    - numpy
+    - scipy
+    - matplotlib
+    - scikits.audiolab
