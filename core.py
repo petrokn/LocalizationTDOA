@@ -39,13 +39,13 @@ class Core:
         self.Z = [-1 if z % 2 == 0 else 1 for z in range(self.N)]
         self.Z = [5 * z + 5 for z in self.Z]
 
-        self.Sen_position = numpy.column_stack((self.X, self.Y, self.Z))
-        self.True_position = numpy.zeros((self.Trials, 3))
-        self.Est_position = numpy.zeros((self.Trials, 3))
+        self.sensor_positions = numpy.column_stack((self.X, self.Y, self.Z))
+        self.true_positions = numpy.zeros((self.Trials, 3))
+        self.estimated_positions = numpy.zeros((self.Trials, 3))
 
-        self.Distances = []
-        self.TimeDelay = []
-        self.Padding = []
+        self.distances = []
+        self.time_delays = []
+        self.padding = []
         print 'inited'
 
     def generate_source_positions(self):
@@ -58,53 +58,53 @@ class Core:
             y = r * math.sin(t)
             z = 0.3 * 20
             #z = numpy.random.rand(1) * 20
-            self.True_position[i, 0] = x
-            self.True_position[i, 1] = y
-            self.True_position[i, 2] = z
+            self.true_positions[i, 0] = x
+            self.true_positions[i, 1] = y
+            self.true_positions[i, 2] = z
         print 'generated source positions.'
 
     def generate_distances(self):
-        self.Distances = numpy.zeros((self.Trials, self.N))
+        self.distances = numpy.zeros((self.Trials, self.N))
         for i in range(self.Trials):
             for j in range(self.N):
-                x1 = self.True_position[i, 0]
-                y1 = self.True_position[i, 1]
-                z1 = self.True_position[i, 2]
-                x2 = self.Sen_position[j, 0]
-                y2 = self.Sen_position[j, 1]
-                z2 = self.Sen_position[j, 2]
-                self.Distances[i, j] = math.sqrt((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)
+                x1 = self.true_positions[i, 0]
+                y1 = self.true_positions[i, 1]
+                z1 = self.true_positions[i, 2]
+                x2 = self.sensor_positions[j, 0]
+                y2 = self.sensor_positions[j, 1]
+                z2 = self.sensor_positions[j, 2]
+                self.distances[i, j] = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
         print 'generated distances.'
 
     def prepare(self):
-        self.TimeDelay = numpy.divide(self.Distances, 340.29)
-        self.Padding = numpy.multiply(self.TimeDelay, 44100)
+        self.time_delays = numpy.divide(self.distances, 340.29)
+        self.padding = numpy.multiply(self.time_delays, 44100)
         print 'prepare passed.'
 
     def generate_signals(self):
         for i in range(self.Trials):
-            x = self.True_position[i, 0]
-            y = self.True_position[i, 1]
-            z = self.True_position[i, 2]
+            x = self.true_positions[i, 0]
+            y = self.true_positions[i, 1]
+            z = self.true_positions[i, 2]
 
-            mic_data = [numpy.vstack((numpy.zeros((int(round(self.Padding[i, j])), 1)), self.wave)) for j in range(self.N)]
+            mic_data = [numpy.vstack((numpy.zeros((int(round(self.padding[i, j])), 1)), self.wave)) for j in range(self.N)]
             lenvec = numpy.array([len(mic) for mic in mic_data])
             m = max(lenvec)
             c = numpy.array([m - mic_len for mic_len in lenvec])
             mic_data = [numpy.vstack((current_mic, numpy.zeros((c[idx], 1)))) for idx, current_mic in enumerate(mic_data)]
-            mic_data = [numpy.divide(current_mic, self.Distances[i, idx]) for idx, current_mic in enumerate(mic_data)]
+            mic_data = [numpy.divide(current_mic, self.distances[i, idx]) for idx, current_mic in enumerate(mic_data)]
             multitrack = numpy.array(mic_data)
 
             print 'prepared all data.'
 
-            x, y, z = self.locate(self.Sen_position, multitrack)
+            x, y, z = self.locate(self.sensor_positions, multitrack)
 
-            self.Est_position[i, 0] = x
-            self.Est_position[i, 1] = y
-            self.Est_position[i, 2] = z
+            self.estimated_positions[i, 0] = x
+            self.estimated_positions[i, 1] = y
+            self.estimated_positions[i, 2] = z
 
-    def locate(self, Sen_position, multitrack):
-        s = Sen_position.shape
+    def locate(self, sensor_positions, multitrack):
+        s = sensor_positions.shape
         len = s[0]
 
         timedelayvec = numpy.zeros((len, 1))
@@ -142,15 +142,15 @@ class Core:
         Dmat = numpy.zeros((len, 1))
 
         for i in range(2, len):
-            x1 = Sen_position[0, 0]
-            y1 = Sen_position[0, 1]
-            z1 = Sen_position[0, 2]
-            x2 = Sen_position[1, 0]
-            y2 = Sen_position[1, 1]
-            z2 = Sen_position[1, 2]
-            xi = Sen_position[i, 0]
-            yi = Sen_position[i, 1]
-            zi = Sen_position[i, 2]
+            x1 = sensor_positions[0, 0]
+            y1 = sensor_positions[0, 1]
+            z1 = sensor_positions[0, 2]
+            x2 = sensor_positions[1, 0]
+            y2 = sensor_positions[1, 1]
+            z2 = sensor_positions[1, 2]
+            xi = sensor_positions[i, 0]
+            yi = sensor_positions[i, 1]
+            zi = sensor_positions[i, 2]
             Amat[i] = (1/(340.29*timedelayvec[i]))*(-2*x1+2*xi) - (1/(340.29*timedelayvec[1]))*(-2*x1+2*x2)
             Bmat[i] = (1/(340.29*timedelayvec[i]))*(-2*y1+2*yi) - (1/(340.29*timedelayvec[1]))*(-2*y1+2*y2)
             Cmat[i] = (1/(340.29*timedelayvec[i]))*(-2*z1+2*zi) - (1/(340.29*timedelayvec[1]))*(-2*z1+2*z2)
@@ -189,14 +189,11 @@ class Core:
         return out
 
     def draw_plot(self):
-        pyplot.plot(self.True_position[:, 0], self.True_position[:, 1], 'bd',  label='True pos')
-        pyplot.plot(self.Est_position[:, 0], self.Est_position[:, 1], 'r+', label='Est pos')
+        pyplot.plot(self.true_positions[:, 0], self.true_positions[:, 1], 'bd', label='True pos')
+        pyplot.plot(self.estimated_positions[:, 0], self.estimated_positions[:, 1], 'r+', label='Est pos')
         pyplot.legend(loc='upper right', numpoints=1)
         pyplot.xlabel('X coordinate of target')
         pyplot.ylabel('Y coordinate of target')
         pyplot.title('TDOA Hyperbolic Localization')
         pyplot.axis([-50, 50, -50, 50])
         pyplot.show()
-
-
-

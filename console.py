@@ -24,8 +24,8 @@ if __name__ == '__main__':
     core.prepare()
     core.generate_signals()
 
-    print 'est_x=', float(core.Est_position[0][0]), 'est_y=', float(core.Est_position[0][1]), \
-        'est_z=', float(core.Est_position[0][2]), 'true_x=', float(core.True_position[0][0]),\
-        'true_y=', float(core.True_position[0][1]), 'true_z=', float(core.True_position[0][2])
+    print 'est_x=', float(core.estimated_positions[0][0]), 'est_y=', float(core.estimated_positions[0][1]), \
+        'est_z=', float(core.estimated_positions[0][2]), 'true_x=', float(core.true_positions[0][0]),\
+        'true_y=', float(core.true_positions[0][1]), 'true_z=', float(core.true_positions[0][2])
 
     core.draw_plot()
