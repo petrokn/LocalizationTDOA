@@ -7,13 +7,15 @@ import time
 from parallel_process import ProcessParallel
 from multiprocessing import Array
 from helpers import time_delay_func_paralel, perdelta
+import logging
 
-
-# base algorithm in MATLAB can be found at https://github.com/StevenJL/tdoa_localization/
 class Core:
     def __init__(self, audio, mic_amount, trials, proc_number):
-        if proc_number <= 0:
-            raise ValueError('Amount of process to run must be 1 or greater.')
+        if proc_number <= 0 or mic_amount <= 0 or trials <= 0:
+            raise ValueError('Parameters can''t be less then zero.')
+
+        logging.basicConfig(format='%(levelname)s, %(asctime)s:%(message)s', filename='example.log', level=logging.INFO)
+        logging.info('Starting core init.')
 
         self.proc_numer = proc_number
 
@@ -30,13 +32,13 @@ class Core:
 
         self.Trials = trials
         self.Radius = 50
-        self.N = mic_amount
-        self.Theta = numpy.linspace(0, 2 * math.pi, self.N + 1)
+        self.mic_amount = mic_amount
+        self.Theta = numpy.linspace(0, 2 * math.pi, self.mic_amount + 1)
 
         self.X = [self.Radius * math.cos(x) for x in self.Theta[0: -1]]
         self.Y = [self.Radius * math.sin(x) for x in self.Theta[0: -1]]
 
-        self.Z = [-1 if z % 2 == 0 else 1 for z in range(self.N)]
+        self.Z = [-1 if z % 2 == 0 else 1 for z in range(self.mic_amount)]
         self.Z = [5 * z + 5 for z in self.Z]
 
         self.sensor_positions = numpy.column_stack((self.X, self.Y, self.Z))
@@ -46,9 +48,12 @@ class Core:
         self.distances = []
         self.time_delays = []
         self.padding = []
-        print 'inited'
+
+        logging.info('Inited core.')
 
     def generate_source_positions(self):
+        logging.info('Generating sources positions.')
+
         for i in range(self.Trials):
             #r = numpy.random.rand(1) * 50
             #t = numpy.random.rand(1) * 2 * math.pi
@@ -61,12 +66,15 @@ class Core:
             self.true_positions[i, 0] = x
             self.true_positions[i, 1] = y
             self.true_positions[i, 2] = z
-        print 'generated source positions.'
+
+        logging.info('Generated sources positions.')
 
     def generate_distances(self):
-        self.distances = numpy.zeros((self.Trials, self.N))
+        logging.info('Generating distances.')
+
+        self.distances = numpy.zeros((self.Trials, self.mic_amount))
         for i in range(self.Trials):
-            for j in range(self.N):
+            for j in range(self.mic_amount):
                 x1 = self.true_positions[i, 0]
                 y1 = self.true_positions[i, 1]
                 z1 = self.true_positions[i, 2]
@@ -74,12 +82,16 @@ class Core:
                 y2 = self.sensor_positions[j, 1]
                 z2 = self.sensor_positions[j, 2]
                 self.distances[i, j] = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
-        print 'generated distances.'
+
+        logging.info('Generated distances.')
 
     def prepare(self):
+        logging.info('Preparing stage started.')
+
         self.time_delays = numpy.divide(self.distances, 340.29)
         self.padding = numpy.multiply(self.time_delays, 44100)
-        print 'prepare passed.'
+
+        logging.info('Preparing stage ended.')
 
     def generate_signals(self):
         for i in range(self.Trials):
@@ -87,7 +99,7 @@ class Core:
             y = self.true_positions[i, 1]
             z = self.true_positions[i, 2]
 
-            mic_data = [numpy.vstack((numpy.zeros((int(round(self.padding[i, j])), 1)), self.wave)) for j in range(self.N)]
+            mic_data = [numpy.vstack((numpy.zeros((int(round(self.padding[i, j])), 1)), self.wave)) for j in range(self.mic_amount)]
             lenvec = numpy.array([len(mic) for mic in mic_data])
             m = max(lenvec)
             c = numpy.array([m - mic_len for mic_len in lenvec])
