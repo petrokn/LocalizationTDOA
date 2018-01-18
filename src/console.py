@@ -28,6 +28,8 @@ if __name__ == '__main__':
                             level=logging.INFO)
 
     if args.proc_number:
+        if args.proc_number <= 0:
+            raise ValueError('proc_number can''t bel less then zero.')
         cores_to_use = args.proc_number
     else:
         cores_to_use = cpu_count()
@@ -42,12 +44,15 @@ if __name__ == '__main__':
     core.prepare()
     core.generate_signals()
 
-    logging.info('est_x=%.15f, est_y=%.15f, est_z=%.15f', float(core.estimated_positions[0][0]),
-                 float(core.estimated_positions[0][1]),
-                 float(core.estimated_positions[0][2]))
+    for trial_number in range(core.trials):
+        logging.info('Trial number: %d', trial_number + 1)
 
-    logging.info('true_x=%.15f, true_y=%.15f, true_z=%.15f', float(core.true_positions[0][0]),
-                 float(core.true_positions[0][1]),
-                 float(core.true_positions[0][2]))
+        logging.info('Estimated X = %.15f, Estimated Y = %.15f, Estimated Z = %.15f', float(core.estimated_positions[trial_number][0]),
+                    float(core.estimated_positions[trial_number][1]),
+                    float(core.estimated_positions[trial_number][2]))
+
+        logging.info('True X = %.15f, True Y = %.15f, True Z = %.15f', float(core.true_positions[trial_number][0]),
+                    float(core.true_positions[trial_number][1]),
+                    float(core.true_positions[trial_number][2]))
 
     core.draw_plot()

@@ -12,9 +12,6 @@ import logging
 
 class Core:
     def __init__(self, audio, mic_amount, trials, proc_number):
-        if proc_number <= 0 or mic_amount <= 0 or trials <= 0:
-            raise ValueError('Parameters can''t be less then zero.')
-
         logging.info('Starting core init.')
 
         self.proc_numer = proc_number
@@ -30,20 +27,20 @@ class Core:
         self.scale = 0.8 / max(self.wave)
         self.wave = numpy.multiply(self.scale, self.wave)
 
-        self.Trials = trials
-        self.Radius = 50
+        self.trials = trials
+        self.__radius = 50
         self.mic_amount = mic_amount
         self.Theta = numpy.linspace(0, 2 * math.pi, self.mic_amount + 1)
 
-        self.X = [self.Radius * math.cos(x) for x in self.Theta[0: -1]]
-        self.Y = [self.Radius * math.sin(x) for x in self.Theta[0: -1]]
+        self.X = [self.__radius * math.cos(x) for x in self.Theta[0: -1]]
+        self.Y = [self.__radius * math.sin(x) for x in self.Theta[0: -1]]
 
         self.Z = [-1 if z % 2 == 0 else 1 for z in range(self.mic_amount)]
         self.Z = [5 * z + 5 for z in self.Z]
 
         self.sensor_positions = numpy.column_stack((self.X, self.Y, self.Z))
-        self.true_positions = numpy.zeros((self.Trials, 3))
-        self.estimated_positions = numpy.zeros((self.Trials, 3))
+        self.true_positions = numpy.zeros((self.trials, 3))
+        self.estimated_positions = numpy.zeros((self.trials, 3))
 
         self.distances = []
         self.time_delays = []
@@ -54,15 +51,15 @@ class Core:
     def generate_source_positions(self):
         logging.info('Generating sources positions.')
 
-        for i in range(self.Trials):
-            # r = numpy.random.rand(1) * 50
-            # t = numpy.random.rand(1) * 2 * math.pi
-            r = 0.1 * 50
-            t = 0.2 * 50
+        for i in range(self.trials):
+            r = numpy.random.rand(1) * 50
+            t = numpy.random.rand(1) * 2 * math.pi
+            #r = 0.1 * 50
+            #t = 0.2 * 50
             x = r * math.cos(t)
             y = r * math.sin(t)
-            z = 0.3 * 20
-            # z = numpy.random.rand(1) * 20
+            #z = 0.3 * 20
+            z = numpy.random.rand(1) * 20
             self.true_positions[i, 0] = x
             self.true_positions[i, 1] = y
             self.true_positions[i, 2] = z
@@ -72,8 +69,8 @@ class Core:
     def generate_distances(self):
         logging.info('Generating distances.')
 
-        self.distances = numpy.zeros((self.Trials, self.mic_amount))
-        for i in range(self.Trials):
+        self.distances = numpy.zeros((self.trials, self.mic_amount))
+        for i in range(self.trials):
             for j in range(self.mic_amount):
                 x1 = self.true_positions[i, 0]
                 y1 = self.true_positions[i, 1]
@@ -94,7 +91,7 @@ class Core:
         logging.info('Preparing stage ended.')
 
     def generate_signals(self):
-        for i in range(self.Trials):
+        for i in range(self.trials):
             x = self.true_positions[i, 0]
             y = self.true_positions[i, 1]
             z = self.true_positions[i, 2]
