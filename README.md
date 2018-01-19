@@ -15,3 +15,9 @@ Based on:
 - scipy
 - matplotlib
 - scikits.audiolab
+
+# Launch
+```sh
+$ cd src
+$ python console.py -m 5 -p 2 -t 2 -f "../samples/sample.wav"
+```
