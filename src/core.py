@@ -139,7 +139,7 @@ class Core:
                 ranges.append(result)
 
             for start, end in ranges:
-                pp.add_task(helpers.time_delay_funciton_optimized, (start, end, outs, multitrack))
+                pp.add_task(helpers.time_delay_function_optimized, (start, end, outs, multitrack))
 
             pp.start_all()
             pp.join_all()

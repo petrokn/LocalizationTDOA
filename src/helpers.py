@@ -2,7 +2,7 @@ import numpy
 import logging
 
 
-def time_delay_funciton_optimized(start, end, outs, multi):
+def time_delay_function_optimized(start, end, outs, multi):
     for idx in range(start, end):
         logging.info('Locating...')
 
