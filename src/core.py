@@ -29,13 +29,13 @@ class Core:
 
         self.trials = trials
         self.__radius = 50
-        self.mic_amount = mic_amount
-        self.Theta = numpy.linspace(0, 2 * math.pi, self.mic_amount + 1)
+        self.__microphone_amount = mic_amount
+        self.Theta = numpy.linspace(0, 2 * math.pi, self.__microphone_amount + 1)
 
         self.X = [self.__radius * math.cos(x) for x in self.Theta[0: -1]]
         self.Y = [self.__radius * math.sin(x) for x in self.Theta[0: -1]]
 
-        self.Z = [-1 if z % 2 == 0 else 1 for z in range(self.mic_amount)]
+        self.Z = [-1 if z % 2 == 0 else 1 for z in range(self.__microphone_amount)]
         self.Z = [5 * z + 5 for z in self.Z]
 
         self.sensor_positions = numpy.column_stack((self.X, self.Y, self.Z))
@@ -56,9 +56,9 @@ class Core:
             t = numpy.random.rand(1) * 2 * math.pi
             #r = 0.1 * 50
             #t = 0.2 * 50
+            #z = 0.3 * 20
             x = r * math.cos(t)
             y = r * math.sin(t)
-            #z = 0.3 * 20
             z = numpy.random.rand(1) * 20
             self.true_positions[i, 0] = x
             self.true_positions[i, 1] = y
@@ -69,9 +69,9 @@ class Core:
     def generate_distances(self):
         logging.info('Generating distances.')
 
-        self.distances = numpy.zeros((self.trials, self.mic_amount))
+        self.distances = numpy.zeros((self.trials, self.__microphone_amount))
         for i in range(self.trials):
-            for j in range(self.mic_amount):
+            for j in range(self.__microphone_amount):
                 x1 = self.true_positions[i, 0]
                 y1 = self.true_positions[i, 1]
                 z1 = self.true_positions[i, 2]
@@ -97,7 +97,7 @@ class Core:
             z = self.true_positions[i, 2]
 
             mic_data = [numpy.vstack((numpy.zeros((int(round(self.padding[i, j])), 1)), self.wave)) for j in
-                        range(self.mic_amount)]
+                        range(self.__microphone_amount)]
             lenvec = numpy.array([len(mic) for mic in mic_data])
             m = max(lenvec)
             c = numpy.array([m - mic_len for mic_len in lenvec])
@@ -107,8 +107,11 @@ class Core:
             multitrack = numpy.array(mic_data)
 
             logging.info('Prepared all data.')
+            logging.info('Started source localization.')
 
             x, y, z = self.locate(self.sensor_positions, multitrack)
+
+            logging.info('Localized source.')
 
             self.estimated_positions[i, 0] = x
             self.estimated_positions[i, 1] = y
@@ -118,13 +121,13 @@ class Core:
         s = sensor_positions.shape
         len = s[0]
 
-        timedelayvec = numpy.zeros((len, 1))
+        time_delays = numpy.zeros((len, 1))
 
         starts = time.time()
 
         if self.proc_numer == 1:
             for p in range(len):
-                timedelayvec[p] = self.time_delay_func(multitrack[0,], multitrack[p,])
+                time_delays[p] = Core.time_delay_function(multitrack[0,], multitrack[p,])
         else:
             pp = ProcessParallel()
 
@@ -142,9 +145,10 @@ class Core:
             pp.join_all()
 
             for idx, res in enumerate(outs):
-                timedelayvec[idx] = res
+                time_delays[idx] = res
 
         ends = time.time()
+
         logging.info('%.15f passed for trial.', ends - starts)
 
         Amat = numpy.zeros((len, 1))
@@ -162,16 +166,16 @@ class Core:
             xi = sensor_positions[i, 0]
             yi = sensor_positions[i, 1]
             zi = sensor_positions[i, 2]
-            Amat[i] = (1 / (340.29 * timedelayvec[i])) * (-2 * x1 + 2 * xi) - (1 / (340.29 * timedelayvec[1])) * (
+            Amat[i] = (1 / (340.29 * time_delays[i])) * (-2 * x1 + 2 * xi) - (1 / (340.29 * time_delays[1])) * (
                 -2 * x1 + 2 * x2)
-            Bmat[i] = (1 / (340.29 * timedelayvec[i])) * (-2 * y1 + 2 * yi) - (1 / (340.29 * timedelayvec[1])) * (
+            Bmat[i] = (1 / (340.29 * time_delays[i])) * (-2 * y1 + 2 * yi) - (1 / (340.29 * time_delays[1])) * (
                 -2 * y1 + 2 * y2)
-            Cmat[i] = (1 / (340.29 * timedelayvec[i])) * (-2 * z1 + 2 * zi) - (1 / (340.29 * timedelayvec[1])) * (
+            Cmat[i] = (1 / (340.29 * time_delays[i])) * (-2 * z1 + 2 * zi) - (1 / (340.29 * time_delays[1])) * (
                 -2 * z1 + 2 * z2)
             Sum1 = (x1 ** 2) + (y1 ** 2) + (z1 ** 2) - (xi ** 2) - (yi ** 2) - (zi ** 2)
             Sum2 = (x1 ** 2) + (y1 ** 2) + (z1 ** 2) - (x2 ** 2) - (y2 ** 2) - (z2 ** 2)
-            Dmat[i] = 340.29 * (timedelayvec[i] - timedelayvec[1]) + (1 / (340.29 * timedelayvec[i])) * Sum1 - (1 / (
-                340.29 * timedelayvec[1])) * Sum2
+            Dmat[i] = 340.29 * (time_delays[i] - time_delays[1]) + (1 / (340.29 * time_delays[i])) * Sum1 - (1 / (
+                340.29 * time_delays[1])) * Sum2
 
         M = numpy.zeros((len + 1, 3))
         D = numpy.zeros((len + 1, 1))
@@ -196,7 +200,7 @@ class Core:
         return x, y, z
 
     @staticmethod
-    def time_delay_func(x, y):
+    def time_delay_function(x, y):
         c = numpy.correlate(x[:, 0], y[:, 0], "full")
         C, I = c.max(0), c.argmax(0)
         out = ((float(len(c)) + 1.0) / 2.0 - I) / 44100.0
