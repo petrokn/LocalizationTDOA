@@ -6,7 +6,7 @@ from scipy import linalg
 import time
 from parallel_process import ProcessParallel
 from multiprocessing import Array
-from helpers import time_delay_func_paralel, perdelta
+import helpers
 import logging
 
 
@@ -127,7 +127,7 @@ class Core:
 
         if self.proc_numer == 1:
             for p in range(len):
-                time_delays[p] = Core.time_delay_function(multitrack[0,], multitrack[p,])
+                time_delays[p] = helpers.time_delay_function(multitrack[0,], multitrack[p,])
         else:
             pp = ProcessParallel()
 
@@ -135,11 +135,11 @@ class Core:
 
             ranges = []
 
-            for result in perdelta(0, len, len / self.proc_numer):
+            for result in helpers.per_delta(0, len, len / self.proc_numer):
                 ranges.append(result)
 
             for start, end in ranges:
-                pp.add_task(time_delay_func_paralel, (start, end, outs, multitrack))
+                pp.add_task(helpers.time_delay_funciton_optimized, (start, end, outs, multitrack))
 
             pp.start_all()
             pp.join_all()
@@ -198,13 +198,6 @@ class Core:
         z = T[2]
 
         return x, y, z
-
-    @staticmethod
-    def time_delay_function(x, y):
-        c = numpy.correlate(x[:, 0], y[:, 0], "full")
-        C, I = c.max(0), c.argmax(0)
-        out = ((float(len(c)) + 1.0) / 2.0 - I) / 44100.0
-        return out
 
     def draw_plot(self):
         pyplot.plot(self.true_positions[:, 0], self.true_positions[:, 1], 'bd', label='True position')
