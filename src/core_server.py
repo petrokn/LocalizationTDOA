@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from core import Core
+from src.logic.core import Core
 from multiprocessing import freeze_support
 
 app = Flask(__name__)

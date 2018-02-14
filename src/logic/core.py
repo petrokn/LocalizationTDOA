@@ -4,9 +4,9 @@ import math
 from matplotlib import pyplot
 from scipy import linalg
 import time
-from parallel_process import ProcessParallel
+from src.logic.parallel_process import ProcessParallel
 from multiprocessing import Array
-import helpers
+from src.logic import helpers
 import logging
 
 
