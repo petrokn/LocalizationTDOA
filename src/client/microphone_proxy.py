@@ -8,7 +8,6 @@ server_address = ('localhost', 10000)
 message = 'This is the message.  It will be repeated.'
 
 try:
-
     # Send data
     print >>sys.stderr, 'sending "%s"' % message
     sent = sock.sendto(message, server_address)
