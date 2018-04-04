@@ -1,7 +1,8 @@
-import socket
 import numpy
-import sys
 from scikits.audiolab import wavread
+
+# noinspection PyUnresolvedReferences
+from src.client.microphone_proxy import MicrophoneProxy
 
 
 class Orchestrator:
@@ -32,24 +33,5 @@ class Orchestrator:
             self.send_data_via_udp(self.microphone_data[i])
 
     def send_data_via_udp(self, message):
-
-        # Create a UDP socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-        server_address = (self.server_address, self.server_port)
-        # server_address = ('localhost', 10000)
-        # message = 'This is the message.  It will be repeated.'
-
-        try:
-            # Send data
-            print >> sys.stderr, 'sending "%s"' % message
-            sent = sock.sendto(message, server_address)
-
-            # Receive response
-            print >> sys.stderr, 'waiting to receive'
-            data, server = sock.recvfrom(4096)
-            print >> sys.stderr, 'received "%s"' % data
-
-        finally:
-            print >> sys.stderr, 'closing socket'
-            sock.close()
+        proxy = MicrophoneProxy(self.server_address, self.server_port)
+        proxy.send(message)
