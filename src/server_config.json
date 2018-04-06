@@ -1,0 +1,7 @@
+{
+  "server_address" : "localhost",
+  "server_port" : 10000,
+  "radius" : 50,
+  "process_amount" : 2,
+  "trials": 1
+}

@@ -7,18 +7,18 @@ from src.client.microphone_proxy import MicrophoneProxy
 
 class Orchestrator:
     def __init__(self, audio, microphone_amount, server_address, server_port):
-        self.audio = audio
-        self.server_address = server_address
-        self.server_port = server_port
-        self.microphone_amount = microphone_amount
-        self.microphone_proxies = []
-        self.microphone_data = []
-        self.wave = []
+        self.__audio = audio
+        self.__server_address = server_address
+        self.__server_port = server_port
+        self.__microphone_amount = microphone_amount
+        self.__microphone_proxies = []
+        self.__microphone_data = []
+        self.__wave = []
+        self.__proxies = []
 
     def handle_file_data(self):
-
         # removing header and second channel data
-        wave = wavread(self.audio)[0]
+        wave = wavread(self.__audio)[0]
         wave = [list(pair) for pair in wave]
         audio_data = numpy.array(wave)
         wave = list(audio_data.flatten())
@@ -26,12 +26,13 @@ class Orchestrator:
         wave = numpy.array(wave).reshape(-1, 1)
 
         scale = 0.8 / max(wave)
-        self.wave = numpy.multiply(scale, wave)
+        self.__wave = numpy.multiply(scale, wave)
 
-    def spawn_microphones(self):
-        for i in range(self.microphone_amount):
-            self.send_data_via_udp(self.microphone_data[i])
+    def send_data_to_server(self):
+        for i in range(self.__microphone_amount):
+            self.__send_data_via_proxy(self.__microphone_data[i])
 
-    def send_data_via_udp(self, message):
-        proxy = MicrophoneProxy(self.server_address, self.server_port)
+    def __send_data_via_proxy(self, message):
+        proxy = MicrophoneProxy(self.__server_address, self.__server_port)
+        self.__proxies.append(proxy)
         proxy.send(message)
