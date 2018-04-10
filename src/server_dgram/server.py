@@ -21,7 +21,6 @@ class Server:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         # Bind the socket to the port
-        #server_address = ('localhost', 10000)
         server_address = (self.__server_address, self.__server_port)
         print >> sys.stderr, 'starting up on %s port %s' % server_address
         sock.bind(server_address)
@@ -56,7 +55,17 @@ class Server:
         logging.info('Generated sources positions.')
 
     def log_results(self):
-        pass
+        for trial_number in range(self.__trials):
+            logging.info('Trial number: %d', trial_number + 1)
+
+            logging.info('Estimated X = %.15f, Estimated Y = %.15f, Estimated Z = %.15f',
+                         float(self.__estimated_positions[trial_number][0]),
+                         float(self.__estimated_positions[trial_number][1]),
+                         float(self.__estimated_positions[trial_number][2]))
+
+            logging.info('True X = %.15f, True Y = %.15f, True Z = %.15f', float(self.__true_positions[trial_number][0]),
+                         float(self.__true_positions[trial_number][1]),
+                         float(self.__true_positions[trial_number][2]))
 
     def draw_plot(self):
         pyplot.plot(self.__true_positions[:, 0], self.__true_positions[:, 1], 'bd', label='True position')
