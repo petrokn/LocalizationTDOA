@@ -7,8 +7,9 @@ from matplotlib import pyplot
 
 
 class Server:
-    def __init__(self, server_address, server_port, true_positions, estimated_positions, trials):
+    def __init__(self, server_address, server_port, true_positions, estimated_positions, microphone_amount, trials):
         self.__server_address = server_address
+        self.__microphone_amount = microphone_amount
         self.__server_port = server_port
         self.__true_positions = true_positions
         self.__estimated_positions = estimated_positions
