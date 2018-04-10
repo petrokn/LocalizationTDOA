@@ -55,6 +55,9 @@ class Server:
 
         logging.info('Generated sources positions.')
 
+    def log_results(self):
+        pass
+
     def draw_plot(self):
         pyplot.plot(self.__true_positions[:, 0], self.__true_positions[:, 1], 'bd', label='True position')
         pyplot.plot(self.__estimated_positions[:, 0], self.__estimated_positions[:, 1], 'r+', label='Estimated position')

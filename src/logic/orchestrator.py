@@ -56,4 +56,4 @@ class Orchestrator:
         proxy.send(message)
 
     def locate(self):
-        pass
+        self.__server.locate()
