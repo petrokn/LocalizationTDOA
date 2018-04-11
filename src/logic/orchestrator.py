@@ -1,4 +1,5 @@
 import numpy
+import math
 from scikits.audiolab import wavread
 # noinspection PyUnresolvedReferences
 from src.client.microphone_proxy import MicrophoneProxy
@@ -7,9 +8,9 @@ from src.server_dgram.server import Server
 
 
 class Orchestrator:
-    def __init__(self, audio, microphone_amount, trials, server_address, server_port):
+    def __init__(self, config):
         # File name
-        self.__audio = audio
+        self.__audio = config["audio"]
 
         # Audio data
         self.__wave = []
@@ -17,16 +18,19 @@ class Orchestrator:
         self.__proxies = []
 
         # Server data
-        self.__trials = trials
-        self.__server = None
-        self.__server_address = server_address
-        self.__server_port = server_port
-        self.__microphone_amount = microphone_amount
+        self.__trials = int(config["trials"])
+        self.__cores_amount = int(config["cores_amount"])
+        self.server = None
+        self.__server_address = config["server_address"]
+        self.__server_port = int(config["server_port"])
+        self.__microphone_amount = int(config["microphone_amount"])
+        self.__radius = int(config["radius"])
         self.__microphone_data = []
-        self.__true_positions = []
-        self.__estimated_positions = []
+        self.__true_positions = None
+        self.__estimated_positions = None
+        self.__sensor_positions = None
 
-    def handle_file_data(self):
+    def retrieve_file_data(self):
         # removing header and second channel data
         wave = wavread(self.__audio)[0]
         wave = [list(pair) for pair in wave]
@@ -39,12 +43,26 @@ class Orchestrator:
         self.__wave = numpy.multiply(scale, wave)
 
     def init_server(self):
-        self.__server = Server(self.__server_address,
+        theta = numpy.linspace(0, 2 * math.pi, self.__microphone_amount + 1)
+        X = [self.__radius * math.cos(x) for x in theta[0: -1]]
+        Y = [self.__radius * math.sin(x) for x in theta[0: -1]]
+        Z = [-1 if z % 2 == 0 else 1 for z in range(self.__microphone_amount)]
+        Z = [5 * z + 5 for z in Z]
+
+        self.__sensor_positions = numpy.column_stack((X, Y, Z))
+        self.__true_positions = numpy.zeros((self.__trials, 3))
+        self.__estimated_positions = numpy.zeros((self.__trials, 3))
+
+        self.server = Server(self.__server_address,
                                self.__server_port,
                                self.__true_positions,
                                self.__estimated_positions,
+                               self.__sensor_positions,
                                self.__microphone_amount,
-                               self.__trials)
+                               self.__trials,
+                               (X, Y, Z),
+                               self.__cores_amount,
+                               self.__wave)
 
     def send_data_to_server(self):
         for i in range(self.__microphone_amount):
@@ -56,8 +74,8 @@ class Orchestrator:
         proxy.send(message)
 
     def locate(self):
-        self.__server.locate()
+        self.server.locate()
 
     def display_results(self):
-        self.__server.log_results()
-        self.__server.draw_plot()
+        self.server.log_results()
+        self.server.draw_plot()

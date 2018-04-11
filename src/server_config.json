@@ -2,7 +2,8 @@
   "server_address" : "localhost",
   "server_port" : 10000,
   "radius" : 50,
-  "process_amount" : 2,
+  "cores_amount" : 2,
   "trials": 1,
-  "audio": "../samples/sample5.wav"
+  "audio": "../samples/sample5.wav",
+  "microphone_amount": 5
 }

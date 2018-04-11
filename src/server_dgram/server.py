@@ -17,20 +17,25 @@ class Server:
                  server_port,
                  true_positions,
                  estimated_positions,
+                 sensor_positions,
                  microphone_amount,
                  trials,
-                 cores_amount):
+                 coordinates,
+                 cores_amount,
+                 wave):
+        self.__x, self.__y, self.__z = coordinates
         self.__server_address = server_address
         self.__microphone_amount = microphone_amount
         self.__server_port = server_port
         self.__true_positions = true_positions
         self.__estimated_positions = estimated_positions
         self.__trials = trials
-        self.__sensor_positions = []
+        self.__sensor_positions = sensor_positions
         self.__distances = []
         self.__time_delays = []
         self.__padding = []
         self.__cores_amount = cores_amount
+        self.__wave = wave
 
     def run(self):
 
@@ -43,7 +48,8 @@ class Server:
 
         sock.bind(server_address)
 
-        while True:
+        received_data_count = 0
+        while received_data_count < self.__microphone_amount:
             print >> sys.stderr, '\nwaiting to receive message'
             data, address = sock.recvfrom(4096)
 
@@ -53,6 +59,8 @@ class Server:
             if data:
                 sent = sock.sendto(data, address)
                 print >> sys.stderr, 'sent %s bytes back to %s' % (sent, address)
+
+            received_data_count += 1
 
     def generate_source_positions(self):
         logging.info('Generating sources positions.')
@@ -120,6 +128,33 @@ class Server:
         self.__padding = numpy.multiply(self.__time_delays, 44100)
 
         logging.info('Preparing stage ended.')
+
+    def generate_signals(self):
+        for i in range(self.__trials):
+            x = self.__true_positions[i, 0]
+            y = self.__true_positions[i, 1]
+            z = self.__true_positions[i, 2]
+
+            mic_data = [numpy.vstack((numpy.zeros((int(round(self.__padding[i, j])), 1)), self.__wave)) for j in
+                        range(self.__microphone_amount)]
+            lenvec = numpy.array([len(mic) for mic in mic_data])
+            m = max(lenvec)
+            c = numpy.array([m - mic_len for mic_len in lenvec])
+            mic_data = [numpy.vstack((current_mic, numpy.zeros((c[idx], 1)))) for idx, current_mic in
+                        enumerate(mic_data)]
+            mic_data = [numpy.divide(current_mic, self.__distances[i, idx]) for idx, current_mic in enumerate(mic_data)]
+            multitrack = numpy.array(mic_data)
+
+            logging.info('Prepared all data.')
+            logging.info('Started source localization.')
+
+            x, y, z = self.locate(self.__sensor_positions, multitrack)
+
+            logging.info('Localized source.')
+
+            self.__estimated_positions[i, 0] = x
+            self.__estimated_positions[i, 1] = y
+            self.__estimated_positions[i, 2] = z
 
     def locate(self, sensor_positions, multitrack):
         s = sensor_positions.shape
