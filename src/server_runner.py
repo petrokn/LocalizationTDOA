@@ -9,9 +9,16 @@ def main():
 
     logging.basicConfig(format='%(levelname)s, PID: %(process)d, %(asctime)s:\t%(message)s', level=logging.INFO)
 
-    data = json.load(open('server_config.json'))
+    config = json.load(open('server_config.json'))
 
-    orchestrator = Orchestrator(audio=data["audio"])
+    orchestrator = Orchestrator(config)
+    orchestrator.retrieve_file_data()
+    orchestrator.init_server()
+    orchestrator.server.generate_source_positions()
+    orchestrator.server.generate_distances()
+    orchestrator.server.prepare()
+    orchestrator.server.generate_signals()
+    orchestrator.display_results()
 
 
 if __name__ == '__main__':
