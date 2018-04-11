@@ -3,11 +3,23 @@ import socket
 import sys
 import numpy
 import math
+import time
+from scipy import linalg
 from matplotlib import pyplot
+from multiprocessing import Array
+from src.logic import helpers
+from src.logic.parallel_process import ProcessParallel
 
 
 class Server:
-    def __init__(self, server_address, server_port, true_positions, estimated_positions, microphone_amount, trials):
+    def __init__(self,
+                 server_address,
+                 server_port,
+                 true_positions,
+                 estimated_positions,
+                 microphone_amount,
+                 trials,
+                 cores_amount):
         self.__server_address = server_address
         self.__microphone_amount = microphone_amount
         self.__server_port = server_port
@@ -18,6 +30,7 @@ class Server:
         self.__distances = []
         self.__time_delays = []
         self.__padding = []
+        self.__cores_amount = cores_amount
 
     def run(self):
 
@@ -26,7 +39,8 @@ class Server:
 
         # Bind the socket to the port
         server_address = (self.__server_address, self.__server_port)
-        print >> sys.stderr, 'starting up on %s port %s' % server_address
+        logging.info('Starting up on %s port %s', server_address)
+
         sock.bind(server_address)
 
         while True:
@@ -98,3 +112,93 @@ class Server:
         pyplot.title('TDOA Hyperbolic Localization')
         pyplot.axis([-50, 50, -50, 50])
         pyplot.show()
+
+    def prepare(self):
+        logging.info('Preparing stage started.')
+
+        self.__time_delays = numpy.divide(self.__distances, 340.29)
+        self.__padding = numpy.multiply(self.__time_delays, 44100)
+
+        logging.info('Preparing stage ended.')
+
+    def locate(self, sensor_positions, multitrack):
+        s = sensor_positions.shape
+        len = s[0]
+
+        time_delays = numpy.zeros((len, 1))
+
+        starts = time.time()
+
+        if self.__cores_amount == 1:
+            for p in range(len):
+                time_delays[p] = helpers.time_delay_function(multitrack[0,], multitrack[p,])
+        else:
+            pp = ProcessParallel()
+
+            outs = Array('d', range(len))
+
+            ranges = []
+
+            for result in helpers.per_delta(0, len, len / self.__cores_amount):
+                ranges.append(result)
+
+            for start, end in ranges:
+                pp.add_task(helpers.time_delay_function_optimized, (start, end, outs, multitrack))
+
+            pp.start_all()
+            pp.join_all()
+
+            for idx, res in enumerate(outs):
+                time_delays[idx] = res
+
+        ends = time.time()
+
+        logging.info('%.15f passed for trial.', ends - starts)
+
+        Amat = numpy.zeros((len, 1))
+        Bmat = numpy.zeros((len, 1))
+        Cmat = numpy.zeros((len, 1))
+        Dmat = numpy.zeros((len, 1))
+
+        for i in range(2, len):
+            x1 = sensor_positions[0, 0]
+            y1 = sensor_positions[0, 1]
+            z1 = sensor_positions[0, 2]
+            x2 = sensor_positions[1, 0]
+            y2 = sensor_positions[1, 1]
+            z2 = sensor_positions[1, 2]
+            xi = sensor_positions[i, 0]
+            yi = sensor_positions[i, 1]
+            zi = sensor_positions[i, 2]
+            Amat[i] = (1 / (340.29 * time_delays[i])) * (-2 * x1 + 2 * xi) - (1 / (340.29 * time_delays[1])) * (
+                -2 * x1 + 2 * x2)
+            Bmat[i] = (1 / (340.29 * time_delays[i])) * (-2 * y1 + 2 * yi) - (1 / (340.29 * time_delays[1])) * (
+                -2 * y1 + 2 * y2)
+            Cmat[i] = (1 / (340.29 * time_delays[i])) * (-2 * z1 + 2 * zi) - (1 / (340.29 * time_delays[1])) * (
+                -2 * z1 + 2 * z2)
+            Sum1 = (x1 ** 2) + (y1 ** 2) + (z1 ** 2) - (xi ** 2) - (yi ** 2) - (zi ** 2)
+            Sum2 = (x1 ** 2) + (y1 ** 2) + (z1 ** 2) - (x2 ** 2) - (y2 ** 2) - (z2 ** 2)
+            Dmat[i] = 340.29 * (time_delays[i] - time_delays[1]) + (1 / (340.29 * time_delays[i])) * Sum1 - (1 / (
+                340.29 * time_delays[1])) * Sum2
+
+        M = numpy.zeros((len + 1, 3))
+        D = numpy.zeros((len + 1, 1))
+        for i in range(len):
+            M[i, 0] = Amat[i]
+            M[i, 1] = Bmat[i]
+            M[i, 2] = Cmat[i]
+            D[i] = Dmat[i]
+
+        M = numpy.array(M[2:len, :])
+        D = numpy.array(D[2:len])
+
+        D = numpy.multiply(-1, D)
+
+        Minv = linalg.pinv(M)
+
+        T = numpy.dot(Minv, D)
+        x = T[0]
+        y = T[1]
+        z = T[2]
+
+        return x, y, z
