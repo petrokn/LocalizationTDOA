@@ -1,13 +1,7 @@
 import logging
 import socket
-
-import StringIO
-import msgpack
-import msgpack_numpy
 import numpy
-import math
 import time
-import pickle
 from cPickle import loads
 from scipy import linalg
 from matplotlib import pyplot

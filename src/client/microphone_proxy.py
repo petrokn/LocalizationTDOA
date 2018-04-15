@@ -1,13 +1,7 @@
 import logging
 import socket
-import textwrap
-from StringIO import StringIO
-from cPickle import dumps
-
-import pickle
-
-import numpy
 import time
+from cPickle import dumps
 
 
 class MicrophoneProxy:
@@ -31,7 +25,7 @@ class MicrophoneProxy:
             logging.info(" !!!!  Data length is %s id %s", data_len, str(self.id))
             if data_len > 65535 - 28 - 36:
 
-                data = [serialized[i:i+65000] for i in range(0, data_len, 65000)]
+                data = [serialized[i:i + 65000] for i in range(0, data_len, 65000)]
 
                 for i in range(len(data)):
                     logging.info("Sending %s chunk from mic with id %s and len %s", i, self.id, len(data[i]) + 36)
