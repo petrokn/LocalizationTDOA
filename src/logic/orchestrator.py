@@ -1,9 +1,8 @@
 import numpy
 import math
+import uuid
 from scikits.audiolab import wavread
-# noinspection PyUnresolvedReferences
 from src.client.microphone_proxy import MicrophoneProxy
-# noinspection PyUnresolvedReferences
 from src.server_dgram.server import Server
 
 
@@ -25,7 +24,6 @@ class Orchestrator:
         self.__server_port = int(config["server_port"])
         self.__microphone_amount = int(config["microphone_amount"])
         self.__radius = int(config["radius"])
-        self.__microphone_data = []
         self.__true_positions = None
         self.__estimated_positions = None
         self.__sensor_positions = None
@@ -54,28 +52,37 @@ class Orchestrator:
         self.__estimated_positions = numpy.zeros((self.__trials, 3))
 
         self.server = Server(self.__server_address,
-                               self.__server_port,
-                               self.__true_positions,
-                               self.__estimated_positions,
-                               self.__sensor_positions,
-                               self.__microphone_amount,
-                               self.__trials,
-                               (X, Y, Z),
-                               self.__cores_amount,
-                               self.__wave)
+                             self.__server_port,
+                             self.__true_positions,
+                             self.__estimated_positions,
+                             self.__sensor_positions,
+                             self.__microphone_amount,
+                             self.__trials,
+                             (X, Y, Z),
+                             self.__cores_amount)
 
     def send_data_to_server(self):
-        for i in range(self.__microphone_amount):
-            self.__send_data_via_proxy(self.__microphone_data[i])
+        for i in range(self.__trials):
+            microphone_data = [numpy.vstack((numpy.zeros((int(round(self.server.padding[i, j])), 1)), self.__wave)) for
+                               j in
+                               range(self.__microphone_amount)]
+            lenvec = numpy.array([len(mic) for mic in microphone_data])
+            m = max(lenvec)
+            c = numpy.array([m - mic_len for mic_len in lenvec])
+            microphone_data = [numpy.vstack((current_mic, numpy.zeros((c[idx], 1)))) for idx, current_mic in
+                               enumerate(microphone_data)]
+            microphone_data = [numpy.divide(current_mic, self.server.distances[i, idx]) for idx, current_mic in
+                               enumerate(microphone_data)]
+
+            for j in range(self.__microphone_amount):
+                self.__send_data_via_proxy(microphone_data[j])
 
     def __send_data_via_proxy(self, message):
-        proxy = MicrophoneProxy(self.__server_address, self.__server_port)
+        proxy = MicrophoneProxy(self.__server_address, self.__server_port, uuid.uuid4())
         self.__proxies.append(proxy)
-        proxy.send(message)
+        proxy.run(message)
 
-    def locate(self):
-        self.server.locate()
-
-    def display_results(self):
+    def locate(self,s):
+        self.server.handle_retrieved_data(s)
         self.server.log_results()
         self.server.draw_plot()

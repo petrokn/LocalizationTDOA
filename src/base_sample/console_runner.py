@@ -1,4 +1,4 @@
-from src.logic.core import Core
+from src.base_sample.core import Core
 from multiprocessing import freeze_support, cpu_count
 import argparse
 import logging

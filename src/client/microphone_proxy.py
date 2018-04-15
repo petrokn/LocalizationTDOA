@@ -1,12 +1,19 @@
 import logging
 import socket
+import textwrap
+from StringIO import StringIO
+from cPickle import dumps
+
+import pickle
+
+import numpy
+import time
 
 
 class MicrophoneProxy:
-    def __init__(self, server_address, server_port, message, id):
+    def __init__(self, server_address, server_port, id):
         self.__server_address = server_address
         self.__server_port = server_port
-        self.message = message
         self.id = id
 
     def run(self, message):
@@ -18,15 +25,26 @@ class MicrophoneProxy:
         try:
             # Send data
             logging.info("Sending data from microphone with id %s.", self.id)
+            serialized = dumps(message)
+            data_len = len(serialized)
 
-            sent = sock.sendto(self.message, server_address)
+            logging.info(" !!!!  Data length is %s id %s", data_len, str(self.id))
+            if data_len > 65535 - 28 - 36:
 
-            # Receive response
-            logging.info("Data sent. Awaiting for response.")
+                data = [serialized[i:i+65000] for i in range(0, data_len, 65000)]
 
-            data, server = sock.recvfrom(4096)
+                for i in range(len(data)):
+                    logging.info("Sending %s chunk from mic with id %s and len %s", i, self.id, len(data[i]) + 36)
 
-            logging.info("Received server response.")
+                    sock.sendto(str(self.id) + data[i], server_address)
+                    time.sleep(0.5)
+            else:
+                sock.sendto(str(self.id) + serialized, server_address)
+
+            time.sleep(0.1)
+            sock.sendto(str(self.id), server_address)
+            logging.info("Sending info chunk from mic with id %s and len %s", self.id, len(str(self.id)))
+            logging.info("Data sent.")
         finally:
             logging.info("Closing microphone's socket with id %s.", self.id)
 

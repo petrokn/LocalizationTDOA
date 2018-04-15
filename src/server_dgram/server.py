@@ -1,15 +1,21 @@
 import logging
 import socket
-import sys
+
+import StringIO
+import msgpack
+import msgpack_numpy
 import numpy
 import math
 import time
+import pickle
+from cPickle import loads
 from scipy import linalg
 from matplotlib import pyplot
 from multiprocessing import Array
 from src.logic import helpers
 from src.logic.parallel_process import ProcessParallel
-
+from scipy import *
+from numpy import *
 
 class Server:
     def __init__(self,
@@ -21,8 +27,7 @@ class Server:
                  microphone_amount,
                  trials,
                  coordinates,
-                 cores_amount,
-                 wave):
+                 cores_amount):
         self.__x, self.__y, self.__z = coordinates
         self.__server_address = server_address
         self.__microphone_amount = microphone_amount
@@ -35,32 +40,46 @@ class Server:
         self.__time_delays = []
         self.__padding = []
         self.__cores_amount = cores_amount
-        self.__wave = wave
+        self.__microphone_data = None
+        self.__raw_microphone_data = []
 
-    def run(self):
+    def generate_data(self):
+        self.generate_source_positions()
+        self.generate_distances()
+        self.prepare()
+
+    def run(self, s):
 
         # Create a TCP/IP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         # Bind the socket to the port
         server_address = (self.__server_address, self.__server_port)
-        logging.info('Starting up on %s port %s', server_address)
+        logging.info('Starting up on %s port %s', self.__server_address, self.__server_port)
 
         sock.bind(server_address)
 
+        microphones_data = {}
+
         received_data_count = 0
         while received_data_count < self.__microphone_amount:
-            print >> sys.stderr, '\nwaiting to receive message'
-            data, address = sock.recvfrom(4096)
+            logging.info('Waiting to receive message...')
 
-            print >> sys.stderr, 'received %s bytes from %s' % (len(data), address)
-            print >> sys.stderr, data
+            data, address = sock.recvfrom(65535 - 28)
+            logging.info("Recived %s", len(data))
+            if len(data) == 36:
+                s[received_data_count] = microphones_data[data]
+                received_data_count += 1
+                logging.info("Received data from %s microphones", received_data_count)
+            else:
+                microphone_id = data[0:36]
 
-            if data:
-                sent = sock.sendto(data, address)
-                print >> sys.stderr, 'sent %s bytes back to %s' % (sent, address)
+            if not microphone_id in microphones_data:
+                microphones_data[microphone_id] = data[36:]
+            else:
+                microphones_data[microphone_id] += data[36:]
 
-            received_data_count += 1
+        logging.info("Received data from all microphones")
 
     def generate_source_positions(self):
         logging.info('Generating sources positions.')
@@ -129,26 +148,21 @@ class Server:
 
         logging.info('Preparing stage ended.')
 
-    def generate_signals(self):
+    def handle_retrieved_data(self, s):
         for i in range(self.__trials):
             x = self.__true_positions[i, 0]
             y = self.__true_positions[i, 1]
             z = self.__true_positions[i, 2]
 
-            mic_data = [numpy.vstack((numpy.zeros((int(round(self.__padding[i, j])), 1)), self.__wave)) for j in
-                        range(self.__microphone_amount)]
-            lenvec = numpy.array([len(mic) for mic in mic_data])
-            m = max(lenvec)
-            c = numpy.array([m - mic_len for mic_len in lenvec])
-            mic_data = [numpy.vstack((current_mic, numpy.zeros((c[idx], 1)))) for idx, current_mic in
-                        enumerate(mic_data)]
-            mic_data = [numpy.divide(current_mic, self.__distances[i, idx]) for idx, current_mic in enumerate(mic_data)]
-            multitrack = numpy.array(mic_data)
+            temp = []
+            for j in range(self.__microphone_amount):
+                temp.append(s[j])
 
+            multi_track = numpy.array([loads(raw) for raw in temp])
             logging.info('Prepared all data.')
             logging.info('Started source localization.')
 
-            x, y, z = self.locate(self.__sensor_positions, multitrack)
+            x, y, z = self.locate(self.__sensor_positions, multi_track)
 
             logging.info('Localized source.')
 
@@ -206,15 +220,15 @@ class Server:
             yi = sensor_positions[i, 1]
             zi = sensor_positions[i, 2]
             Amat[i] = (1 / (340.29 * time_delays[i])) * (-2 * x1 + 2 * xi) - (1 / (340.29 * time_delays[1])) * (
-                -2 * x1 + 2 * x2)
+                    -2 * x1 + 2 * x2)
             Bmat[i] = (1 / (340.29 * time_delays[i])) * (-2 * y1 + 2 * yi) - (1 / (340.29 * time_delays[1])) * (
-                -2 * y1 + 2 * y2)
+                    -2 * y1 + 2 * y2)
             Cmat[i] = (1 / (340.29 * time_delays[i])) * (-2 * z1 + 2 * zi) - (1 / (340.29 * time_delays[1])) * (
-                -2 * z1 + 2 * z2)
+                    -2 * z1 + 2 * z2)
             Sum1 = (x1 ** 2) + (y1 ** 2) + (z1 ** 2) - (xi ** 2) - (yi ** 2) - (zi ** 2)
             Sum2 = (x1 ** 2) + (y1 ** 2) + (z1 ** 2) - (x2 ** 2) - (y2 ** 2) - (z2 ** 2)
             Dmat[i] = 340.29 * (time_delays[i] - time_delays[1]) + (1 / (340.29 * time_delays[i])) * Sum1 - (1 / (
-                340.29 * time_delays[1])) * Sum2
+                    340.29 * time_delays[1])) * Sum2
 
         M = numpy.zeros((len + 1, 3))
         D = numpy.zeros((len + 1, 1))
@@ -237,3 +251,11 @@ class Server:
         z = T[2]
 
         return x, y, z
+
+    @property
+    def padding(self):
+        return self.__padding
+
+    @property
+    def distances(self):
+        return self.__distances

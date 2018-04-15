@@ -4,6 +4,6 @@
   "radius" : 50,
   "cores_amount" : 2,
   "trials": 1,
-  "audio": "../samples/sample5.wav",
+  "audio": "../samples/sample.wav",
   "microphone_amount": 5
 }
