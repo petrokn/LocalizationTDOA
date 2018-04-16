@@ -84,5 +84,7 @@ class Orchestrator:
 
     def locate(self,s):
         self.server.handle_retrieved_data(s)
+
+    def get_results(self):
         self.server.log_results()
         self.server.draw_plot()

@@ -11,6 +11,7 @@ from src.logic.parallel_process import ProcessParallel
 from scipy import *
 from numpy import *
 
+
 class Server:
     def __init__(self,
                  server_address,
@@ -42,7 +43,7 @@ class Server:
         self.generate_distances()
         self.prepare()
 
-    def run(self, s):
+    def run(self, received_data):
 
         # Create a TCP/IP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -60,9 +61,9 @@ class Server:
             logging.info('Waiting to receive message...')
 
             data, address = sock.recvfrom(65535 - 28)
-            logging.info("Recived %s", len(data))
+            logging.info("Received %s", len(data))
             if len(data) == 36:
-                s[received_data_count] = microphones_data[data]
+                received_data[received_data_count] = microphones_data[data]
                 received_data_count += 1
                 logging.info("Received data from %s microphones", received_data_count)
             else:
@@ -142,17 +143,17 @@ class Server:
 
         logging.info('Preparing stage ended.')
 
-    def handle_retrieved_data(self, s):
+    def handle_retrieved_data(self, received_data):
         for i in range(self.__trials):
             x = self.__true_positions[i, 0]
             y = self.__true_positions[i, 1]
             z = self.__true_positions[i, 2]
 
-            temp = []
+            data = []
             for j in range(self.__microphone_amount):
-                temp.append(s[j])
+                data.append(received_data[j])
 
-            multi_track = numpy.array([loads(raw) for raw in temp])
+            multi_track = numpy.array([loads(raw) for raw in data])
             logging.info('Prepared all data.')
             logging.info('Started source localization.')
 
@@ -164,7 +165,7 @@ class Server:
             self.__estimated_positions[i, 1] = y
             self.__estimated_positions[i, 2] = z
 
-    def locate(self, sensor_positions, multitrack):
+    def locate(self, sensor_positions, multi_track):
         s = sensor_positions.shape
         len = s[0]
 
@@ -174,7 +175,7 @@ class Server:
 
         if self.__cores_amount == 1:
             for p in range(len):
-                time_delays[p] = helpers.time_delay_function(multitrack[0,], multitrack[p,])
+                time_delays[p] = helpers.time_delay_function(multi_track[0,], multi_track[p,])
         else:
             pp = ProcessParallel()
 
@@ -186,7 +187,7 @@ class Server:
                 ranges.append(result)
 
             for start, end in ranges:
-                pp.add_task(helpers.time_delay_function_optimized, (start, end, outs, multitrack))
+                pp.add_task(helpers.time_delay_function_optimized, (start, end, outs, multi_track))
 
             pp.start_all()
             pp.join_all()
@@ -196,7 +197,7 @@ class Server:
 
         ends = time.time()
 
-        logging.info('%.15f passed for trial.', ends - starts)
+        logging.info('%.15f passed for localization computation trial.', ends - starts)
 
         Amat = numpy.zeros((len, 1))
         Bmat = numpy.zeros((len, 1))
