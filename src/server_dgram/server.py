@@ -80,14 +80,14 @@ class Server:
         logging.info('Generating sources positions.')
 
         for i in range(self.__trials):
-            r = numpy.random.rand(1) * 50
-            t = numpy.random.rand(1) * 2 * math.pi
-            # r = 0.1 * 50
-            # t = 0.2 * 50
-            # z = 0.3 * 20
+            #r = numpy.random.rand(1) * 50
+            #t = numpy.random.rand(1) * 2 * math.pi
+            r = 0.1 * 50
+            t = 0.2 * 50
+            z = 0.3 * 20
             x = r * math.cos(t)
             y = r * math.sin(t)
-            z = numpy.random.rand(1) * 20
+            #z = numpy.random.rand(1) * 20
             self.__true_positions[i, 0] = x
             self.__true_positions[i, 1] = y
             self.__true_positions[i, 2] = z
@@ -214,16 +214,32 @@ class Server:
             xi = sensor_positions[i, 0]
             yi = sensor_positions[i, 1]
             zi = sensor_positions[i, 2]
-            Amat[i] = (1 / (340.29 * time_delays[i])) * (-2 * x1 + 2 * xi) - (1 / (340.29 * time_delays[1])) * (
+            if time_delays[i] == 0 and time_delays[1] == 0:
+                Amat[i] = 0
+                Bmat[i] = 0
+                Cmat[i] = 0
+                Dmat[i] = 0
+                continue
+
+            if time_delays[i] == 0:
+                ti_value = 0
+            else:
+                ti_value = 1 / (340.29 * time_delays[i])
+
+            if time_delays[1] == 0:
+                t1_value = 0
+            else:
+                t1_value = 1 / (340.29 * time_delays[1])
+
+            Amat[i] = ti_value * (-2 * x1 + 2 * xi) - t1_value * (
                     -2 * x1 + 2 * x2)
-            Bmat[i] = (1 / (340.29 * time_delays[i])) * (-2 * y1 + 2 * yi) - (1 / (340.29 * time_delays[1])) * (
+            Bmat[i] = ti_value * (-2 * y1 + 2 * yi) - t1_value * (
                     -2 * y1 + 2 * y2)
-            Cmat[i] = (1 / (340.29 * time_delays[i])) * (-2 * z1 + 2 * zi) - (1 / (340.29 * time_delays[1])) * (
+            Cmat[i] = ti_value * (-2 * z1 + 2 * zi) - t1_value * (
                     -2 * z1 + 2 * z2)
             Sum1 = (x1 ** 2) + (y1 ** 2) + (z1 ** 2) - (xi ** 2) - (yi ** 2) - (zi ** 2)
             Sum2 = (x1 ** 2) + (y1 ** 2) + (z1 ** 2) - (x2 ** 2) - (y2 ** 2) - (z2 ** 2)
-            Dmat[i] = 340.29 * (time_delays[i] - time_delays[1]) + (1 / (340.29 * time_delays[i])) * Sum1 - (1 / (
-                    340.29 * time_delays[1])) * Sum2
+            Dmat[i] = 340.29 * (time_delays[i] - time_delays[1]) + ti_value * Sum1 - t1_value * Sum2
 
         M = numpy.zeros((len + 1, 3))
         D = numpy.zeros((len + 1, 1))
