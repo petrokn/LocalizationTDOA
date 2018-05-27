@@ -13,6 +13,11 @@ from numpy import *
 
 
 class Server:
+    # Server constants
+    MESSAGE_SIZE = 65507
+    MICROPHONE_ID_SIZE = 36
+    CHUNK_NUMBER_SIZE = 4
+
     def __init__(self,
                  server_address,
                  server_port,
@@ -60,19 +65,19 @@ class Server:
         while received_data_count < self.__microphone_amount:
             logging.info('Waiting to receive message...')
 
-            data, address = sock.recvfrom(65535 - 28)
+            data, address = sock.recvfrom(self.MESSAGE_SIZE)
             logging.info("Received %s", len(data))
-            if len(data) == 36:
+            if len(data) == self.MICROPHONE_ID_SIZE:
                 received_data[received_data_count] = microphones_data[data]
                 received_data_count += 1
                 logging.info("Received data from %s microphones", received_data_count)
             else:
-                microphone_id = data[0:36]
+                microphone_id = data[0:self.MICROPHONE_ID_SIZE:]
 
             if not microphone_id in microphones_data:
-                microphones_data[microphone_id] = data[36:]
+                microphones_data[microphone_id] = data[self.MICROPHONE_ID_SIZE::]
             else:
-                microphones_data[microphone_id] += data[36:]
+                microphones_data[microphone_id] += data[self.MICROPHONE_ID_SIZE::]
 
         logging.info("Received data from all microphones")
 
