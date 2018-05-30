@@ -72,6 +72,7 @@ class Server:
                 received_data_count += 1
                 logging.info("Received data from %s microphones", received_data_count)
             else:
+                #microphone_id = data[self.CHUNK_NUMBER_SIZE:self.MICROPHONE_ID_SIZE:]
                 microphone_id = data[0:self.MICROPHONE_ID_SIZE:]
 
             if not microphone_id in microphones_data:
