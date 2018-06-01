@@ -1,5 +1,7 @@
 import logging
 import socket
+from collections import OrderedDict
+
 import numpy
 import time
 from cPickle import loads
@@ -65,10 +67,19 @@ class Server:
         while received_data_count < self.__microphone_amount:
             logging.info('Waiting to receive message...')
 
+            chunk_number = 0
+
             data, address = sock.recvfrom(self.MESSAGE_SIZE)
             logging.info("Received %s", len(data))
             if len(data) == self.MICROPHONE_ID_SIZE:
-                received_data[received_data_count] = microphones_data[data]
+                value = sorted(microphones_data[data])
+
+                temp_value = ''
+                for data_key in value:
+                    logging.info(data_key)
+                    temp_value += microphones_data[data][data_key]
+
+                received_data[received_data_count] = temp_value
                 received_data_count += 1
                 logging.info("Received data from %s microphones", received_data_count)
             else:
@@ -76,10 +87,10 @@ class Server:
                 logging.info("Received chunk with number %s:", chunk_number)
                 microphone_id = data[self.CHUNK_NUMBER_SIZE:self.MICROPHONE_ID_SIZE + self.CHUNK_NUMBER_SIZE:]
 
-            if not microphone_id in microphones_data:
-                microphones_data[microphone_id] = data[self.MICROPHONE_ID_SIZE + self.CHUNK_NUMBER_SIZE::]
-            else:
-                microphones_data[microphone_id] += data[self.MICROPHONE_ID_SIZE + self.CHUNK_NUMBER_SIZE::]
+                if not microphone_id in microphones_data:
+                    microphones_data[microphone_id] = {chunk_number: data[self.MICROPHONE_ID_SIZE + self.CHUNK_NUMBER_SIZE::]}
+                else:
+                    microphones_data[microphone_id][chunk_number] = data[self.MICROPHONE_ID_SIZE + self.CHUNK_NUMBER_SIZE::]
 
         logging.info("Received data from all microphones")
 
