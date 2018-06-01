@@ -72,13 +72,14 @@ class Server:
                 received_data_count += 1
                 logging.info("Received data from %s microphones", received_data_count)
             else:
-                #microphone_id = data[self.CHUNK_NUMBER_SIZE:self.MICROPHONE_ID_SIZE:]
-                microphone_id = data[0:self.MICROPHONE_ID_SIZE:]
+                chunk_number = data[0:self.CHUNK_NUMBER_SIZE]
+                logging.info("Received chunk with number %s:", chunk_number)
+                microphone_id = data[self.CHUNK_NUMBER_SIZE:self.MICROPHONE_ID_SIZE + self.CHUNK_NUMBER_SIZE:]
 
             if not microphone_id in microphones_data:
-                microphones_data[microphone_id] = data[self.MICROPHONE_ID_SIZE::]
+                microphones_data[microphone_id] = data[self.MICROPHONE_ID_SIZE + self.CHUNK_NUMBER_SIZE::]
             else:
-                microphones_data[microphone_id] += data[self.MICROPHONE_ID_SIZE::]
+                microphones_data[microphone_id] += data[self.MICROPHONE_ID_SIZE + self.CHUNK_NUMBER_SIZE::]
 
         logging.info("Received data from all microphones")
 
