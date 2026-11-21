@@ -6,27 +6,36 @@ Based on:
     https://github.com/StevenJL/tdoa_localization
 
 #  Requirements
-### System bin/libs:
-- Python 2.7
-- libsndfile-devel
-- tkinter
-### Python libs:
-- numpy
-- scipy
-- matplotlib
-- scikits.audiolab
+- Python 3.14
+- Python libs (see `requirements.txt`):
+  - numpy
+  - scipy (also reads the WAV files, so no libsndfile is needed)
+  - matplotlib
+
+Plots open in matplotlib's native window on macOS and Windows. On Linux, install
+Tk for your Python (e.g. `python3-tk`) or pick another interactive backend.
+
+# Setup
+
+```sh
+$ python3.14 -m venv .venv
+$ source .venv/bin/activate
+$ pip install -r requirements.txt
+```
 
 # Launch of simple console runner
+
+Run from the repository root:
+
 ```sh
-$ cd src/base_sample/
-$ python console_runner.py -m 5 -p 2 -t 2 -f "../samples/sample.wav"
+$ python -m src.base_sample.console_runner -m 5 -p 2 -t 2 -f samples/sample.wav
 ```
 
 # Launch of server runner
 
-Choose desired configuration in server_config.json and run
+Choose desired configuration in `src/server_config.json` (the `audio` path is
+relative to that file) and run from the repository root:
 
 ```sh
-$ cd src
-$ python server_runner.py
+$ python -m src.server_runner
 ```

@@ -1,8 +1,10 @@
-import numpy
 import math
 import uuid
-from scikits.audiolab import wavread
+
+import numpy
+
 from src.client.microphone_proxy import MicrophoneProxy
+from src.logic import helpers
 from src.server_dgram.server import Server
 
 
@@ -29,16 +31,8 @@ class Orchestrator:
         self.__sensor_positions = None
 
     def retrieve_file_data(self):
-        # removing header and second channel data
-        wave = wavread(self.__audio)[0]
-        wave = [list(pair) for pair in wave]
-        audio_data = numpy.array(wave)
-        wave = list(audio_data.flatten())
-        wave = wave[::2]
-        wave = numpy.array(wave).reshape(-1, 1)
-
-        scale = 0.8 / max(wave)
-        self.__wave = numpy.multiply(scale, wave)
+        # first channel of the audio as a (N, 1) column scaled to a 0.8 peak
+        self.__wave = helpers.load_wave(self.__audio)
 
     def init_server(self):
         theta = numpy.linspace(0, 2 * math.pi, self.__microphone_amount + 1)
@@ -61,7 +55,10 @@ class Orchestrator:
                              (X, Y, Z),
                              self.__cores_amount)
 
-    def send_data_to_server(self):
+    def send_data_to_server(self, server_ready=None):
+        if server_ready is not None:
+            server_ready.wait()
+
         for i in range(self.__trials):
             microphone_data = [numpy.vstack((numpy.zeros((int(round(self.server.padding[i, j])), 1)), self.__wave)) for
                                j in

@@ -1,7 +1,9 @@
-from src.base_sample.core import Core
-from multiprocessing import freeze_support, cpu_count
 import argparse
 import logging
+from multiprocessing import freeze_support, cpu_count
+
+from src.base_sample.core import Core
+from src.logic import helpers
 
 if __name__ == '__main__':
     freeze_support()
@@ -21,15 +23,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.log_file:
-        logging.basicConfig(format='%(levelname)s, PID: %(process)d, %(asctime)s:\t%(message)s', level=logging.INFO)
-    else:
-        logging.basicConfig(format='%(levelname)s, PID: %(process)d, %(asctime)s:\t%(message)s', filename=args.log_file,
-                            level=logging.INFO)
+    helpers.setup_logging(args.log_file)
 
-    if args.proc_number:
+    if args.proc_number is not None:
         if args.proc_number <= 0:
-            raise ValueError('proc_number can''t bel less then zero.')
+            raise ValueError("proc_number must be greater than zero.")
         cores_to_use = args.proc_number
     else:
         cores_to_use = cpu_count()

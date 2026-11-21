@@ -1,18 +1,27 @@
 import json
 import logging
-from multiprocessing import freeze_support
 import multiprocessing
 import time
+from multiprocessing import freeze_support
+from pathlib import Path
+
+from src.logic import helpers
 from src.logic.orchestrator import Orchestrator
 from src.logic.parallel_process import ProcessParallel
+
+CONFIG_PATH = Path(__file__).with_name('server_config.json')
 
 
 def main():
     freeze_support()
 
-    logging.basicConfig(format='%(levelname)s, PID: %(process)d, %(asctime)s:\t%(message)s', level=logging.INFO)
+    helpers.setup_logging()
 
-    config = json.load(open('server_config.json'))
+    with CONFIG_PATH.open() as config_file:
+        config = json.load(config_file)
+
+    # the audio path in the config is relative to the config file itself
+    config["audio"] = str(CONFIG_PATH.parent / config["audio"])
 
     orchestrator = Orchestrator(config)
     orchestrator.retrieve_file_data()
@@ -21,11 +30,12 @@ def main():
 
     manager = multiprocessing.Manager()
     received_data = manager.dict()
+    server_ready = manager.Event()
 
     pp = ProcessParallel()
 
-    pp.add_task(orchestrator.server.run, (received_data,))
-    pp.add_task(orchestrator.send_data_to_server, ())
+    pp.add_task(orchestrator.server.run, (received_data, server_ready))
+    pp.add_task(orchestrator.send_data_to_server, (server_ready,))
 
     pp.start_all()
     starts = time.time()

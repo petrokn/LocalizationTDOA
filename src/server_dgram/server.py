@@ -1,15 +1,16 @@
 import logging
+import math
 import socket
-import numpy
 import time
-from cPickle import loads
-from scipy import linalg
-from matplotlib import pyplot
 from multiprocessing import Array
+from pickle import loads
+
+import numpy
+from matplotlib import pyplot
+from scipy import linalg
+
 from src.logic import helpers
 from src.logic.parallel_process import ProcessParallel
-from scipy import *
-from numpy import *
 
 
 class Server:
@@ -43,7 +44,7 @@ class Server:
         self.generate_distances()
         self.prepare()
 
-    def run(self, received_data):
+    def run(self, received_data, ready=None):
 
         # Create a TCP/IP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -53,6 +54,10 @@ class Server:
         logging.info('Starting up on %s port %s', self.__server_address, self.__server_port)
 
         sock.bind(server_address)
+
+        # let the sender know packets won't be dropped anymore
+        if ready is not None:
+            ready.set()
 
         microphones_data = {}
 
@@ -66,13 +71,15 @@ class Server:
                 received_data[received_data_count] = microphones_data[data]
                 received_data_count += 1
                 logging.info("Received data from %s microphones", received_data_count)
-            else:
-                microphone_id = data[0:36]
+                continue
 
-            if not microphone_id in microphones_data:
+            microphone_id = data[0:36]
+            if microphone_id not in microphones_data:
                 microphones_data[microphone_id] = data[36:]
             else:
                 microphones_data[microphone_id] += data[36:]
+
+        sock.close()
 
         logging.info("Received data from all microphones")
 
@@ -169,7 +176,7 @@ class Server:
         s = sensor_positions.shape
         len = s[0]
 
-        time_delays = numpy.zeros((len, 1))
+        time_delays = numpy.zeros(len)
 
         starts = time.time()
 
@@ -183,7 +190,7 @@ class Server:
 
             ranges = []
 
-            for result in helpers.per_delta(0, len, len / self.__cores_amount):
+            for result in helpers.per_delta(0, len, len // self.__cores_amount):
                 ranges.append(result)
 
             for start, end in ranges:
@@ -199,10 +206,10 @@ class Server:
 
         logging.info('%.15f passed for localization computation trial.', ends - starts)
 
-        Amat = numpy.zeros((len, 1))
-        Bmat = numpy.zeros((len, 1))
-        Cmat = numpy.zeros((len, 1))
-        Dmat = numpy.zeros((len, 1))
+        Amat = numpy.zeros(len)
+        Bmat = numpy.zeros(len)
+        Cmat = numpy.zeros(len)
+        Dmat = numpy.zeros(len)
 
         for i in range(2, len):
             x1 = sensor_positions[0, 0]
@@ -241,25 +248,12 @@ class Server:
             Sum2 = (x1 ** 2) + (y1 ** 2) + (z1 ** 2) - (x2 ** 2) - (y2 ** 2) - (z2 ** 2)
             Dmat[i] = 340.29 * (time_delays[i] - time_delays[1]) + ti_value * Sum1 - t1_value * Sum2
 
-        M = numpy.zeros((len + 1, 3))
-        D = numpy.zeros((len + 1, 1))
-        for i in range(len):
-            M[i, 0] = Amat[i]
-            M[i, 1] = Bmat[i]
-            M[i, 2] = Cmat[i]
-            D[i] = Dmat[i]
-
-        M = numpy.array(M[2:len, :])
-        D = numpy.array(D[2:len])
-
-        D = numpy.multiply(-1, D)
+        M = numpy.column_stack((Amat, Bmat, Cmat))[2:len]
+        D = -Dmat[2:len]
 
         Minv = linalg.pinv(M)
 
-        T = numpy.dot(Minv, D)
-        x = T[0]
-        y = T[1]
-        z = T[2]
+        x, y, z = Minv @ D
 
         return x, y, z
 

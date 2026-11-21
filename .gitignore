@@ -62,3 +62,7 @@ target/
 .ipynb_checkpoints
 
 .idea/
+
+# Virtual environments
+.venv/
+venv/
